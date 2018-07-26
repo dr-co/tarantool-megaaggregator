@@ -28,7 +28,7 @@ test:test('push persistent=true',
         test:ok(s, 'stored to persistent space')
 
         test:is(s[2], 'tube', 'tube')
-        test:is(s[4], 'data', 'data')
+        test:is(s[5], 'data', 'data')
         id = s[1]
     end
 )
@@ -44,7 +44,7 @@ test:test('push persistent=false',
         test:ok(s, 'stored to persistent space')
 
         test:is(s[2], 'tube', 'tube')
-        test:is(s[4], 'data', 'data')
+        test:is(s[5], 'data', 'data')
 
         test:is(s[1], id + 1, 'id')
     end

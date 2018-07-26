@@ -32,8 +32,13 @@ migrations.list = {
                             ['name']    = 'time',
                             ['type']    = 'unsigned',
                         },
-
+                        
                         {                           -- #4
+                            ['name']    = 'ttl_to',
+                            ['type']    = 'unsigned',
+                        },
+
+                        {                           -- #5
                             ['name']    = 'data',
                             ['type']    = '*',
                         },

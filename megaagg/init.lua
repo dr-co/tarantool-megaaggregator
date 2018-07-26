@@ -5,7 +5,8 @@ local fiber = require 'fiber'
 local ID        = 1
 local TUBE      = 2
 local TIME      = 3
-local DATA      = 4
+local TTL_TO    = 4
+local DATA      = 5
 
 local agg = {
     VERSION     = '1.0',
@@ -15,6 +16,12 @@ local agg = {
         ttl         = 5 * 60,       -- task ttl
 
         persistent  = false,        -- persistent aggregator
+
+        -- aggregate until the limit exceeded
+        limit       = 150,
+
+        -- aggregate until the timeout exceeded
+        timeout     = 1.5,
     },
 
     private = {
@@ -118,6 +125,7 @@ function agg.push(self, tube, data, opts)
         self:_next_id(),
         tube,
         fiber.time64(),
+        fiber.time64() + tonumber64(tonumber(opts.ttl) * 1000000),
         data
     }
     if self.private.count[tube] == nil then
@@ -129,6 +137,10 @@ function agg.push(self, tube, data, opts)
     self:_wakeup_waiters(tube)
 
     return n
+end
+
+function agg.take(self, tube, limit, timeout)
+
 end
 
 function agg._wakeup_waiters(self, tube)
