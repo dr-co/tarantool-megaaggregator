@@ -70,8 +70,13 @@ migrations.list = {
                             ['name']    = 'time',
                             ['type']    = 'unsigned',
                         },
-
+                        
                         {                           -- #4
+                            ['name']    = 'ttl_to',
+                            ['type']    = 'unsigned',
+                        },
+
+                        {                           -- #5
                             ['name']    = 'data',
                             ['type']    = '*',
                         },
@@ -125,6 +130,32 @@ migrations.list = {
                     type = 'tree',
                     unique = false,
                     parts   = { 2, 'str', 1, 'unsigned' }
+                }
+            )
+        end
+    },
+
+    {
+        description = 'ttl.index for MegaAgg',
+        up = function()
+            box.space.MegaAgg:create_index('ttl',
+                {
+                    type = 'tree',
+                    unique = false,
+                    parts   = { 4, 'unsigned' }
+                }
+            )
+        end
+    },
+
+    {
+        description = 'ttl.index for MegaAggMemOnly',
+        up = function()
+            box.space.MegaAggMemOnly:create_index('ttl',
+                {
+                    type = 'tree',
+                    unique = false,
+                    parts   = { 4, 'unsigned' }
                 }
             )
         end

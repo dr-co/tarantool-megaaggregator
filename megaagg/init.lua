@@ -22,6 +22,9 @@ local agg = {
 
         -- aggregate until the timeout exceeded
         timeout     = 1.5,
+
+        -- watch for ttl
+        cleanup_interval    = 1,
     },
 
     private = {
@@ -31,9 +34,41 @@ local agg = {
 
         count       = {  },
 
-        waiter      = {  }
+        waiter      = {  },
+
+        clean       = {
+            wait = {
+
+            }
+        }
     }
 }
+
+function agg._wait_for(self, tube, sleep)
+    local fid = fiber.self().id
+    if self.private.waiter[ tube ] == nil then
+        self.private.waiter[ tube ] = {}
+    end
+    
+    self.private.waiter[ tube ][ fid ] = fiber.self()
+    fiber.sleep(sleep)
+    self.private.waiter[ tube ][ fid ] = nil
+end
+
+function agg._wakeup_waiters(self, tube)
+
+    local list = self.private.waiter[ tube ]
+    
+    if list == nil then
+        return
+    end
+
+    self.private.waiter[ tube ] = {}
+
+    for fid, f in pairs(list) do
+        f:wakeup()
+    end
+end
 
 function agg._extend(self, t1, t2)
     local res = {}
@@ -91,35 +126,8 @@ function agg._next_id(self)
     return self.private.id
 end
 
-function agg.init(self, defaults)
-    if type(self) ~= 'table' or not self._isAgg then
-        box.error(box.error.PROC_LUA, "usage: megaagg:init([defaults])")
-    end
-    self.defaults = self:_extend(self.defaults, defaults)
-    local upgrades = self.private.migrations:upgrade(self)
-
-    local spaces = { 'MegaAgg', 'MegaAggMemOnly' }
-    self.private.count = {}
-
-    log.info('MegaAgg: fill counters')
-    for _, space in pairs(spaces) do
-        for _, t in box.space[space].index.id:pairs() do
-            local tube = t[TUBE]
-            if self.private.count[tube] == nil then
-                self.private.count[tube] = 1
-            else
-                self.private.count[tube] = self.private.count[tube] + 1
-            end
-        end
-    end
-
-    log.info('MegaAgg started')
-    return upgrades
-end
-
 function agg._push(self, tube, data, opts)
     
-    opts = self:_extend(self.defaults, opts)
     local space = 'MegaAggMemOnly'
     if opts.persistent then
         space = 'MegaAgg'
@@ -140,46 +148,7 @@ function agg._push(self, tube, data, opts)
     return n
 end
 
-function agg.push(self, tube, data, opts)
-    if type(self) ~= 'table' or not self._isAgg then
-        box.error(box.error.PROC_LUA, "usage: megaagg:push(tube, data[, opts])")
-    end
-    tube = tostring(tube)
-
-    box.begin()
-    local n = self:_push(tube, data, opts)
-    box.commit()
-    self:_wakeup_waiters(tube)
-    return n
-end
-
-function agg.push_list(self, tube, list, opts)
-    if type(self) ~= 'table' or not(self._isAgg) or type(list) ~= 'table' then
-        box.error(box.error.PROC_LUA, "usage: megaagg:push_list(tube, datalist[, opts])")
-    end
-    tube = tostring(tube)
-    opts = self:_extend(self.defaults, opts)
-
-    local res = {}
-    box.begin()
-    for _, d in pairs(list) do
-        table.insert(res, self:_push(tube, d, opts))
-    end
-
-    box.commit()
-    self:_wakeup_waiters(tube)
-
-    if #res > 0 then
-        if opts.need_result == nil then
-            return res
-        end
-        if opts.need_result then
-            return res
-        end
-    end
-end
-
-function agg._take(self, tube, limit, since)
+function agg._take(self, tube, limit, since, opts)
 
     local m1 = box.space.MegaAgg.index.tube:min{ tube }
     local m2 = box.space.MegaAgg.index.tube:min{ tube }
@@ -217,6 +186,10 @@ function agg._take(self, tube, limit, since)
                             :pairs({ tube }, { iterator = 'GE' })
 
     local t1, t2
+
+    if opts.limit ~= nil then
+        limit = tonumber(opts.limit)
+    end
 
     s1, t1 = i1(p1, s1)
     s2, t2 = i2(p2, s2)
@@ -262,10 +235,79 @@ function agg._take(self, tube, limit, since)
     return res
 end
 
-function agg.take(self, tube, limit, timeout)
+function agg._clean_ttl(self, space)
+    
+    while true do
+
+        local index = box.space[space].index.ttl
+        local now = fiber.time64()
+        local rm = {}
+        for _, tuple in index:pairs(0, { iterator = 'GE' }) do
+            if tuple[ TTL_TO ] > now then
+                break
+            end
+
+            table.insert(rm, tuple)
+            if #rm > 100 then
+                break
+            end
+        end
+
+        if #rm == 0 then
+            break
+        end
+
+        box.begin()
+        for _, tuple in pairs(rm) do
+            local tube = tuple[ TUBE ]
+            box.space[space]:delete(tuple[ID])
+            self.private.count[ tube ] = self.private.count[ tube ] - 1
+        end
+        box.commit()
+    end
+end
+
+function agg._cleanup_fiber(self)
+
+    -- has already run worker
+    if self.private.clean.fid ~= nil then
+        self.private.clean.fid = nil
+
+        local list = self.private.clean.wait
+        self.private.clean.wait = {}
+
+        for fid, f in pairs(list) do
+            f:wakeup()
+        end
+    end
+    fiber.create(function()
+        local fid = fiber.self().id
+
+        self.private.clean.fid = fid
+        log.info('MegaAgg: cleanup fiber was started')
+
+        while self.private.clean.fid == fid do
+            self:_clean_ttl('MegaAgg')
+            self:_clean_ttl('MegaAggMemOnly')
+            local sleep = self.defaults.cleanup_interval
+            if sleep < 0 then
+                sleep = 1
+            end
+
+            self.private.clean.wait[ fid ] = fiber.self()
+            fiber.sleep(sleep)
+            self.private.clean.wait[ fid ] = nil
+        end
+        
+        log.info('MegaAgg: cleanup fiber was done')
+    end)
+    
+end
+
+function agg.take(self, tube, limit, timeout, opts)
     if type(self) ~= 'table' or not self._isAgg then
         box.error(box.error.PROC_LUA,
-            "usage: megaagg:take(tube[, limit, timeout])")
+            "usage: megaagg:take(tube[, limit, timeout, opts])")
     end
 
     tube = tostring(tube)
@@ -279,13 +321,17 @@ function agg.take(self, tube, limit, timeout)
         limit = self.defaults.limit
     end
 
+    opts = self:_extend({}, opts)
     local finish_time = fiber.time() + timeout
+    if opts.timeout ~= nil then
+        finish_time = fiber.time() + tonumber(opts.timeout)
+    end
 
     while fiber.time() < finish_time do
 
         local since = fiber.time64() - tonumber64(timeout * 1000000)
 
-        local res = self:_take(tube, limit, since)
+        local res = self:_take(tube, limit, since, opts)
         if #res > 0 then
             return res
         end
@@ -294,37 +340,78 @@ function agg.take(self, tube, limit, timeout)
             break
         end
 
-
         self:_wait_for(tube, sleep)
     end
 end
 
-
-function agg._wait_for(self, tube, sleep)
-    local fid = fiber.self().id
-    if self.private.waiter[ tube ] == nil then
-        self.private.waiter[ tube ] = {}
+function agg.push(self, tube, data, opts)
+    if type(self) ~= 'table' or not self._isAgg then
+        box.error(box.error.PROC_LUA, "usage: megaagg:push(tube, data[, opts])")
     end
-    
-    self.private.waiter[ tube ][ fid ] = fiber.self()
-    fiber.sleep(sleep)
-    self.private.waiter[ tube ][ fid ] = nil
+    tube = tostring(tube)
+    opts = self:_extend(self.defaults, opts)
+
+    box.begin()
+    local n = self:_push(tube, data, opts)
+    box.commit()
+    self:_wakeup_waiters(tube)
+    return n
 end
 
-function agg._wakeup_waiters(self, tube)
+function agg.push_list(self, tube, list, opts)
+    if type(self) ~= 'table' or not(self._isAgg) or type(list) ~= 'table' then
+        box.error(box.error.PROC_LUA, "usage: megaagg:push_list(tube, datalist[, opts])")
+    end
+    tube = tostring(tube)
+    opts = self:_extend(self.defaults, opts)
 
-    local list = self.private.waiter[ tube ]
-    
-    if list == nil then
-        return
+    local res = {}
+    box.begin()
+    for _, d in pairs(list) do
+        table.insert(res, self:_push(tube, d, opts))
     end
 
-    self.private.waiter[ tube ] = {}
+    box.commit()
+    self:_wakeup_waiters(tube)
 
-    for fid, f in pairs(list) do
-        f:wakeup()
+    if #res > 0 then
+        if opts.need_result == nil then
+            return res
+        end
+        if opts.need_result then
+            return res
+        end
     end
 end
+
+function agg.init(self, defaults)
+    if type(self) ~= 'table' or not self._isAgg then
+        box.error(box.error.PROC_LUA, "usage: megaagg:init([defaults])")
+    end
+    self.defaults = self:_extend(self.defaults, defaults)
+    local upgrades = self.private.migrations:upgrade(self)
+
+    local spaces = { 'MegaAgg', 'MegaAggMemOnly' }
+    self.private.count = {}
+
+    log.info('MegaAgg: fill counters')
+    for _, space in pairs(spaces) do
+        for _, t in box.space[space].index.id:pairs() do
+            local tube = t[TUBE]
+            if self.private.count[tube] == nil then
+                self.private.count[tube] = 1
+            else
+                self.private.count[tube] = self.private.count[tube] + 1
+            end
+        end
+    end
+    
+    self:_cleanup_fiber()
+    log.info('MegaAgg started')
+    return upgrades
+end
+
+
 
 local priv = {}
 local pub = {}
