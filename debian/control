@@ -1,0 +1,18 @@
+Source: dr-tarantool-megaagg
+Section: database
+Priority: optional
+Maintainer: Dmitry E. Oboukhov <unera@debian.org>
+Uploaders: Roman V. Nikolaev <rshadow@rambler.ru>
+Build-Depends: debhelper (>= 8)
+Build-Depends-Indep: tarantool (>= 1.6)
+Standards-Version: 3.9.6
+
+Package: dr-tarantool-megaagg
+Architecture: all
+Section: database
+Depends: ${misc:Depends}, ${perl:Depends}, tarantool (>= 1.6)
+Homepage: https://github.com/dr-co/tarantool-megaaggregator
+Description: aggregator components for tarantool
+ The package contains init.lua and tarantool.cfg to build agg daemon
+ using tarantool.
+ 
