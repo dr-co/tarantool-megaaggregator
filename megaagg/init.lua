@@ -367,6 +367,7 @@ function agg.push_list(self, tube, list, opts)
 
     local res = {}
     box.begin()
+
     for _, d in pairs(list) do
         table.insert(res, self:_push(tube, d, opts))
     end
