@@ -103,7 +103,32 @@ migrations.list = {
                 }
             )
         end
-    }
+    },
+    
+    {
+        description = 'tube.index for MegaAgg',
+        up = function()
+            box.space.MegaAgg:create_index('tube',
+                {
+                    type = 'tree',
+                    unique = false,
+                    parts   = { 2, 'str', 1, 'unsigned' }
+                }
+            )
+        end
+    },
+    {
+        description = 'tube.index for MegaAggMemOnly',
+        up = function()
+            box.space.MegaAggMemOnly:create_index('tube',
+                {
+                    type = 'tree',
+                    unique = false,
+                    parts   = { 2, 'str', 1, 'unsigned' }
+                }
+            )
+        end
+    },
 }
 
 
