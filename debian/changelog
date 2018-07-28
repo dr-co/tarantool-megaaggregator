@@ -1,3 +1,9 @@
+dr-tarantool-megaagg (0.03) nowtaxi; urgency=medium
+
+  * fiber.id uses properly.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sat, 28 Jul 2018 14:44:26 +0300
+
 dr-tarantool-megaagg (0.02) nowtaxi; urgency=medium
 
   * Add perl module.

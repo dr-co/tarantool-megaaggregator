@@ -45,7 +45,7 @@ local agg = {
 }
 
 function agg._wait_for(self, tube, sleep)
-    local fid = fiber.self().id
+    local fid = fiber.self().id()
     if self.private.waiter[ tube ] == nil then
         self.private.waiter[ tube ] = {}
     end
@@ -280,7 +280,7 @@ function agg._cleanup_fiber(self)
         end
     end
     fiber.create(function()
-        local fid = fiber.self().id
+        local fid = fiber.self().id()
 
         self.private.clean.fid = fid
         log.info('MegaAgg: cleanup fiber was started')
