@@ -5,6 +5,8 @@
 ./debian/dr-tarantool-megaagg.dirs
 ./debian/dr-tarantool-megaagg.docs
 ./debian/dr-tarantool-megaagg.install
+./debian/libdr-tnt-megaagg-perl.docs
+./debian/libdr-tnt-megaagg-perl.install
 ./debian/rules
 ./debian/source/format
 ./lib/DR/Tnt/MegaAgg.pm

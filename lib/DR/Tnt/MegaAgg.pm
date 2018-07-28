@@ -1,3 +1,28 @@
+=head1 NAME
+
+DR::Tnt::MegaAgg - perl module for tarantool aggregator
+
+=head1 SYNOPSIS
+
+    use DR::Tnt;
+    my $tnt = tarantool ...;
+    
+    use DR::Tnt::MegaAgg;
+    my $agg = new DR::Tnt::MegaAgg tnt => $tnt;
+
+
+    $agg->push(test => 123);
+    $agg->push(test => 234, persistent => 0);
+    $agg->pushlist(test => [ 1, 2, 3 ], persistent => 1);
+
+    while() {
+        my $list = $agg->take(test => 100, 5, timeout => .1);
+        next unless @$list;
+        process_list($list)
+    }
+
+=cut
+
 use utf8;
 use strict;
 use warnings;
@@ -5,6 +30,8 @@ use warnings;
 package DR::Tnt::MegaAgg;
 use Mouse;
 use Carp;
+
+our $VERSION = '0.01';
 
 has tnt =>
     is          => 'ro',

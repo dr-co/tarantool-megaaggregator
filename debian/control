@@ -10,9 +10,18 @@ Standards-Version: 3.9.6
 Package: dr-tarantool-megaagg
 Architecture: all
 Section: database
-Depends: ${misc:Depends}, ${perl:Depends}, tarantool (>= 1.6)
+Depends: ${misc:Depends},
+  tarantool (>= 1.6)
 Homepage: https://github.com/dr-co/tarantool-megaaggregator
 Description: aggregator components for tarantool
  The package contains init.lua and tarantool.cfg to build agg daemon
  using tarantool.
- 
+
+Package: libdr-tnt-megaagg-perl
+Architecture: all
+Section: perl
+Depends: ${misc:Depends},
+  ${perl:Depends},
+  libdr-tnt-perl
+Homepage: https://github.com/dr-co/tarantool-megaaggregator
+Description: client for tarantool megaaggregator
