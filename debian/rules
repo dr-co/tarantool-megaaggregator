@@ -5,6 +5,3 @@
 %:
 	dh $@
 
-override_dh_install:
-	prove -r t
-	dh_install
