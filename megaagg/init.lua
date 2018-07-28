@@ -151,7 +151,7 @@ end
 function agg._take(self, tube, limit, since, opts)
 
     local m1 = box.space.MegaAgg.index.tube:min{ tube }
-    local m2 = box.space.MegaAgg.index.tube:min{ tube }
+    local m2 = box.space.MegaAggMemOnly.index.tube:min{ tube }
 
     if m1 ~= nil and m1[TUBE] ~= tube then
         m1 = nil
@@ -168,7 +168,7 @@ function agg._take(self, tube, limit, since, opts)
     if m2 ~= nil and m2[TIME] <= since then
         has_result = true
     end
-
+    
     if self.private.count[tube] ~= nil then
         if self.private.count[tube] >= limit then
             has_result = true
@@ -238,7 +238,6 @@ end
 function agg._clean_ttl(self, space)
     
     while true do
-
         local index = box.space[space].index.ttl
         local now = fiber.time64()
         local rm = {}

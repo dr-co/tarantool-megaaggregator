@@ -3,7 +3,7 @@
 local yaml = require 'yaml'
 local test = require('tap').test()
 local fiber = require 'fiber'
-test:plan(14)
+test:plan(16)
 
 local tnt = require('t.tnt')
 test:ok(tnt, 'tarantool loaded')
@@ -16,10 +16,12 @@ test:ok(agg:init() > 0, 'First init megaagg')
 test:ok(box.space.MegaAgg, 'Space  MegaAgg created')
 test:ok(box.space.MegaAggMemOnly, 'Space MegaAggMemOnly created')
 
+test:ok(0 == #box.space.MegaAgg:select{}, 'MegaAgg empty')
+test:ok(0 == #box.space.MegaAggMemOnly:select{}, 'MegaAggMemOnly empty')
 
 for i = 1, 1000 do
     if math.random() > 0.01 then
-        agg:push('tube', i, { persistent =  1 })
+        agg:push('tube', i, { persistent =  true })
     else
         agg:push('tube', i, { persistent =  false })
     end
@@ -27,8 +29,8 @@ end
 
 test:is(agg.private.count.tube, 1000, 'inserts')
 
-test:ok(#box.space.MegaAgg:select{}, 'MegaAgg contains records')
-test:ok(#box.space.MegaAggMemOnly:select{}, 'MegaAggMemOnly contains records')
+test:ok(0 < #box.space.MegaAgg:select{}, 'MegaAgg contains records')
+test:ok(0 < #box.space.MegaAggMemOnly:select{}, 'MegaAggMemOnly contains records')
 
 
 local list = agg:take('tube', 1000, 10)
