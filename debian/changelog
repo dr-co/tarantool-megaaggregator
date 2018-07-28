@@ -1,3 +1,9 @@
+dr-tarantool-megaagg (0.02) nowtaxi; urgency=medium
+
+  * Add perl module.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sat, 28 Jul 2018 12:25:46 +0300
+
 dr-tarantool-megaagg (0.01) nowtaxi; urgency=medium
 
   * Init commit.
