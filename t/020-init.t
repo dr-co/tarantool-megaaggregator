@@ -3,7 +3,7 @@
 local yaml = require 'yaml'
 local test = require('tap').test()
 local fiber = require 'fiber'
-test:plan(5)
+test:plan(6)
 
 local tnt = require('t.tnt')
 test:ok(tnt, 'tarantool loaded')
@@ -15,6 +15,7 @@ test:ok(agg:init() > 0, 'First init megaagg')
 
 test:ok(box.space.MegaAgg, 'Space  MegaAgg created')
 test:ok(box.space.MegaAggMemOnly, 'Space MegaAggMemOnly created')
+test:like(agg.private.clean.fid, '%d', 'fid')
 
 -- test:diag(tnt.log())
 
